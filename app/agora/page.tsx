@@ -1,19 +1,18 @@
-// ✅ Agora Group Call with Name/Role Labels + Large Host Video (Vercel-ready)
+// ✅ Agora Group Call – Fully Vercel Compatible Version
 
 'use client';
-
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useRef, useState } from 'react';
-import AgoraRTC, {
+import type {
 	IAgoraRTCClient,
 	ILocalVideoTrack,
 	ILocalAudioTrack,
 	IAgoraRTCRemoteUser,
 } from 'agora-rtc-sdk-ng';
 
-const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
 const CHANNEL = 'webrtc-room';
+const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
 
 export default function AgoraLive() {
 	const videoGridRef = useRef<HTMLDivElement>(null);
@@ -30,43 +29,49 @@ export default function AgoraLive() {
 	const [videoMuted, setVideoMuted] = useState(false);
 
 	useEffect(() => {
-		if (typeof window !== 'undefined') {
-			const agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-			setClient(agoraClient);
+		const initAgora = async () => {
+			if (typeof window !== 'undefined') {
+				const AgoraRTC = (await import('agora-rtc-sdk-ng')).default;
+				const agoraClient = AgoraRTC.createClient({
+					mode: 'rtc',
+					codec: 'vp8',
+				});
+				setClient(agoraClient);
 
-			agoraClient.on('user-published', async (user, mediaType) => {
-				await agoraClient.subscribe(user, mediaType);
-				if (mediaType === 'video') {
-					setRemoteUsers((prev) => [...prev, user]);
-					requestAnimationFrame(() => {
-						const container = document.getElementById(`remote-${user.uid}`);
-						if (container && user.videoTrack) {
-							user.videoTrack.play(
-								container.querySelector('.video') as HTMLElement
-							);
-						}
-					});
-				}
-				if (mediaType === 'audio') {
-					user.audioTrack?.play();
-				}
-			});
+				agoraClient.on('user-published', async (user, mediaType) => {
+					await agoraClient.subscribe(user, mediaType);
+					if (mediaType === 'video') {
+						setRemoteUsers((prev) => [...prev, user]);
+						requestAnimationFrame(() => {
+							const container = document.getElementById(`remote-${user.uid}`);
+							if (container && user.videoTrack) {
+								user.videoTrack.play(
+									container.querySelector('.video') as HTMLElement
+								);
+							}
+						});
+					}
+					if (mediaType === 'audio') {
+						user.audioTrack?.play();
+					}
+				});
 
-			agoraClient.on('user-unpublished', (user) => {
-				setRemoteUsers((prev) => prev.filter((u) => u.uid !== user.uid));
-			});
-		}
+				agoraClient.on('user-unpublished', (user) => {
+					setRemoteUsers((prev) => prev.filter((u) => u.uid !== user.uid));
+				});
+			}
+		};
+		initAgora();
 	}, []);
 
 	const joinAsHost = async () => {
 		if (!client) return;
 		setIsHost(true);
 		await client.join(APP_ID, CHANNEL, null, username + ' (Host)');
-
+		const AgoraRTC = (await import('agora-rtc-sdk-ng')).default;
 		const micTrack = await AgoraRTC.createMicrophoneAudioTrack();
 		const camTrack = await AgoraRTC.createCameraVideoTrack();
 		setLocalTracks([micTrack, camTrack]);
-
 		await client.publish([micTrack, camTrack]);
 		renderLocalVideo(camTrack);
 		setJoined(true);
@@ -81,13 +86,11 @@ export default function AgoraLive() {
 
 	const joinCallAsAudience = async () => {
 		if (!client || joinedCall) return;
-
+		const AgoraRTC = (await import('agora-rtc-sdk-ng')).default;
 		const micTrack = await AgoraRTC.createMicrophoneAudioTrack();
 		const camTrack = await AgoraRTC.createCameraVideoTrack();
-
 		await client.publish([micTrack, camTrack]);
 		renderLocalVideo(camTrack);
-
 		setLocalTracks([micTrack, camTrack]);
 		setJoinedCall(true);
 	};
@@ -128,25 +131,15 @@ export default function AgoraLive() {
 
 	const toggleMic = async () => {
 		if (localTracks[0]) {
-			if (audioMuted) {
-				await localTracks[0].setEnabled(true);
-				setAudioMuted(false);
-			} else {
-				await localTracks[0].setEnabled(false);
-				setAudioMuted(true);
-			}
+			await localTracks[0].setEnabled(!audioMuted);
+			setAudioMuted(!audioMuted);
 		}
 	};
 
 	const toggleCamera = async () => {
 		if (localTracks[1]) {
-			if (videoMuted) {
-				await localTracks[1].setEnabled(true);
-				setVideoMuted(false);
-			} else {
-				await localTracks[1].setEnabled(false);
-				setVideoMuted(true);
-			}
+			await localTracks[1].setEnabled(!videoMuted);
+			setVideoMuted(!videoMuted);
 		}
 	};
 
@@ -179,7 +172,6 @@ export default function AgoraLive() {
 					Leave
 				</button>
 			</div>
-
 			{joined && !isHost && !joinedCall && (
 				<button
 					onClick={joinCallAsAudience}
@@ -188,7 +180,6 @@ export default function AgoraLive() {
 					🎥 Join Call
 				</button>
 			)}
-
 			{joinedCall && (
 				<div className='flex gap-4 mb-4'>
 					<button
@@ -205,7 +196,6 @@ export default function AgoraLive() {
 					</button>
 				</div>
 			)}
-
 			<div
 				ref={videoGridRef}
 				className='grid grid-cols-2 gap-4 w-full max-w-xl'
