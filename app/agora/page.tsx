@@ -1,6 +1,8 @@
-// ✅ Agora Group Call with Name/Role Labels + Large Host Video
+// ✅ Agora Group Call with Name/Role Labels + Large Host Video (Vercel-ready)
 
 'use client';
+
+export const dynamic = 'force-dynamic';
 
 import { useEffect, useRef, useState } from 'react';
 import AgoraRTC, {
@@ -10,7 +12,7 @@ import AgoraRTC, {
 	IAgoraRTCRemoteUser,
 } from 'agora-rtc-sdk-ng';
 
-const APP_ID = 'ea643921acb64dafbafbcd54698f71c8';
+const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
 const CHANNEL = 'webrtc-room';
 
 export default function AgoraLive() {
@@ -28,34 +30,32 @@ export default function AgoraLive() {
 	const [videoMuted, setVideoMuted] = useState(false);
 
 	useEffect(() => {
-		const agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-		setClient(agoraClient);
+		if (typeof window !== 'undefined') {
+			const agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+			setClient(agoraClient);
 
-		agoraClient.on('user-published', async (user, mediaType) => {
-			await agoraClient.subscribe(user, mediaType);
-			if (mediaType === 'video') {
-				setRemoteUsers((prev) => [...prev, user]);
-				requestAnimationFrame(() => {
-					const container = document.getElementById(`remote-${user.uid}`);
-					if (container && user.videoTrack) {
-						user.videoTrack.play(
-							container.querySelector('.video') as HTMLElement
-						);
-					}
-				});
-			}
-			if (mediaType === 'audio') {
-				user.audioTrack?.play();
-			}
-		});
+			agoraClient.on('user-published', async (user, mediaType) => {
+				await agoraClient.subscribe(user, mediaType);
+				if (mediaType === 'video') {
+					setRemoteUsers((prev) => [...prev, user]);
+					requestAnimationFrame(() => {
+						const container = document.getElementById(`remote-${user.uid}`);
+						if (container && user.videoTrack) {
+							user.videoTrack.play(
+								container.querySelector('.video') as HTMLElement
+							);
+						}
+					});
+				}
+				if (mediaType === 'audio') {
+					user.audioTrack?.play();
+				}
+			});
 
-		agoraClient.on('user-unpublished', (user) => {
-			setRemoteUsers((prev) => prev.filter((u) => u.uid !== user.uid));
-		});
-
-		return () => {
-			agoraClient.leave();
-		};
+			agoraClient.on('user-unpublished', (user) => {
+				setRemoteUsers((prev) => prev.filter((u) => u.uid !== user.uid));
+			});
+		}
 	}, []);
 
 	const joinAsHost = async () => {
